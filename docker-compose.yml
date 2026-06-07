@@ -1,0 +1,60 @@
+services:
+  worker-agent:
+    image: entergtang/etflix-worker-agent:${WORKER_AGENT_IMAGE_TAG:-latest}
+    container_name: etflix-worker-agent
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      WORKER_AGENT_PORT: "8090"
+      WORKER_ID: "${WORKER_ID:-}"
+      WORKER_ID_FILE: "${WORKER_ID_FILE:-/home/appuser/data/worker-id}"
+      CONTROL_API_BASE_URL: "${CONTROL_API_BASE_URL:?set CONTROL_API_BASE_URL to the controller API URL}"
+      WORKER_CONTROL_TRANSPORT: "${WORKER_CONTROL_TRANSPORT:-ws}"
+      WORKER_ENABLE_YIDONG139: "${WORKER_ENABLE_YIDONG139:-true}"
+      WORKER_ENABLE_TIANYI189: "${WORKER_ENABLE_TIANYI189:-false}"
+      WORKER_CONTROL_TIMEOUT_MS: "${WORKER_CONTROL_TIMEOUT_MS:-3000}"
+      TIANYI_CAS_SHARE_WALK_CONCURRENCY: "${TIANYI_CAS_SHARE_WALK_CONCURRENCY:-3}"
+      TIANYI_CAS_RESOLVE_MANIFEST_CONCURRENCY: "${TIANYI_CAS_RESOLVE_MANIFEST_CONCURRENCY:-3}"
+      WORKER_STATE_FILE: "/home/appuser/data/worker-state.json"
+      WORKER_STATE_PERSIST_INTERVAL_MS: "${WORKER_STATE_PERSIST_INTERVAL_MS:-2000}"
+    ports:
+      - "${WORKER_API_PORT:-18091}:8090"
+    volumes:
+      - worker_data:/home/appuser/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8090/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  worker-web:
+    image: entergtang/etflix-worker-web:${WORKER_WEB_IMAGE_TAG:-latest}
+    container_name: etflix-worker-web
+    restart: unless-stopped
+    depends_on:
+      worker-agent:
+        condition: service_healthy
+    ports:
+      - "${WORKER_WEB_PORT:-18090}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  worker_data:
