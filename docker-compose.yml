@@ -23,6 +23,9 @@ services:
       - "${WORKER_API_PORT:-18091}:8090"
     volumes:
       - worker_data:/home/appuser/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.scope: "etflix-worker-agent"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -45,11 +48,37 @@ services:
         condition: service_healthy
     ports:
       - "${WORKER_WEB_PORT:-18090}:80"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.scope: "etflix-worker-agent"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
       interval: 15s
       timeout: 3s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  watchtower:
+    image: containrrr/watchtower:${WATCHTOWER_IMAGE_TAG:-latest}
+    container_name: etflix-worker-watchtower
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_SCOPE: "etflix-worker-agent"
+      WATCHTOWER_CLEANUP: "${WATCHTOWER_CLEANUP:-true}"
+      WATCHTOWER_POLL_INTERVAL: "${WATCHTOWER_POLL_INTERVAL:-60}"
+      WATCHTOWER_ROLLING_RESTART: "${WATCHTOWER_ROLLING_RESTART:-true}"
+    volumes:
+      # Watchtower needs Docker API access to pull images and recreate labeled containers.
+      - /var/run/docker.sock:/var/run/docker.sock
     logging:
       driver: "json-file"
       options:
